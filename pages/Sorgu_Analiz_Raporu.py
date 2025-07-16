@@ -24,15 +24,25 @@ def load_data(path_ana, path_booking):
         ana_df["Sorgu_OK"] / ana_df["Toplam_Sorgu"]
     ).fillna(0).round(4)
 
-    booking_df = booking_df[["JP Code", "Agency", "Status by booking element"]].copy()
-    booking_df.columns = ["JPCode", "Agency", "Durum"]
+    booking_df = booking_df[[
+        "JP Code", "Agency", "Product Type", "Status by booking element"
+    ]].copy()
+    booking_df.columns = ["JPCode", "Agency", "ProductType", "Durum"]
     booking_df["Durum"] = booking_df["Durum"].fillna("Unknown").str.strip().str.lower()
+    booking_df["ProductType"] = booking_df["ProductType"].fillna("Unknown").str.strip()
+    booking_df["Agency"] = booking_df["Agency"].fillna("Unknown").str.strip()
 
     rez_list = []
     for _, row in ana_df.iterrows():
         jp = row["JPCode"]
-        ag = row["Firma"]
-        ilgili = booking_df[(booking_df["JPCode"] == jp) & (booking_df["Agency"] == ag)]
+        firma = row["Firma"]
+        kategori = row["Kategori"].strip().lower()
+
+        if kategori == "supplier":
+            ilgili = booking_df[(booking_df["JPCode"] == jp) & (booking_df["ProductType"] == firma)]
+        else:
+            ilgili = booking_df[(booking_df["JPCode"] == jp) & (booking_df["Agency"] == firma)]
+
         ok = (ilgili["Durum"] == "ok").sum()
         cancelled = (ilgili["Durum"] == "cancelled").sum()
         toplam = ok + cancelled
@@ -47,7 +57,6 @@ df = load_data(excel_path, excel_path)
 
 # --- 🎛️ Filtreler
 st.sidebar.title("🔍 Filtreler")
-
 kategori_list = sorted(df["Kategori"].dropna().unique())
 secili_kategori = st.sidebar.selectbox("Kategori Seçin (zorunlu)", kategori_list)
 
@@ -71,13 +80,13 @@ gosterilecek.columns = [
 
 gosterilecek = gosterilecek.reset_index(drop=True)
 
-# --- 🔍 Rezervasyon Durumu Filtresi (Total Reservations bazlı)
+# --- Rezervasyon Durumu Filtresi
 if secili_durum == "Satış Var":
     gosterilecek = gosterilecek[gosterilecek["Total Reservations"] > 0]
 elif secili_durum == "Satış Yok":
     gosterilecek = gosterilecek[gosterilecek["Total Reservations"] == 0]
 
-# --- 📊 Formatlar
+# --- Sayısal Biçimlendirme
 formatlar = {
     "Hotel Requests OK": "{:,.0f}",
     "Total Requests": "{:,.0f}",
@@ -90,13 +99,12 @@ formatlar = {
 for col in formatlar:
     gosterilecek[col] = pd.to_numeric(gosterilecek[col], errors="coerce")
 
-# --- 🧾 Sayfa Başlığı
+# --- Başlık
 st.title("📊 Sorgu Analiz Raporu")
 st.subheader(f"Kategori: {secili_kategori} | Firma: {secili_firma} | Durum: {secili_durum}")
 
-# --- 📦 Metrikler (3 üst - 3 alt kutucuk)
+# --- Kutucuklarla Toplamlar
 toplamlar = gosterilecek.sum(numeric_only=True)
-
 total_sorgu = toplamlar.get("Total Requests", 0)
 total_ok_sorgu = toplamlar.get("Hotel Requests OK", 0)
 basari_orani = total_ok_sorgu / total_sorgu if total_sorgu else 0
@@ -116,7 +124,7 @@ alt[0].metric("Rezervasyon (OK)", f"{int(rez_ok):,}".replace(",", "."))
 alt[1].metric("İptal (Cancelled)", f"{int(rez_cancelled):,}".replace(",", "."))
 alt[2].metric("İptal Oranı", f"{iptal_orani:.0%}")
 
-# --- 📋 Tablo Gösterimi
+# --- Tablonun Gösterimi
 st.markdown("### 📌 Detaylı Otel Performansı")
 st.dataframe(
     gosterilecek
