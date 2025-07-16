@@ -12,7 +12,6 @@ def load_data(path_ana, path_booking):
     ana_df = pd.read_excel(path_ana, sheet_name=sheet_ana)
     booking_df = pd.read_excel(path_booking, sheet_name=sheet_booking)
 
-    # Temel sütunları yeniden adlandır
     ana_df = ana_df[[
         "Hotel", "JPCode", "Hotel Requests OK", "% Hotel Requests OK",
         "Total Hotel Requests", "Kategori", "SEÇ"
@@ -22,12 +21,11 @@ def load_data(path_ana, path_booking):
         "Kategori", "Firma"
     ]
 
-    # Booking verisi temizleme
     booking_df = booking_df[["JP Code", "Agency", "Status by booking element"]].copy()
     booking_df.columns = ["JPCode", "Agency", "Durum"]
     booking_df["Durum"] = booking_df["Durum"].fillna("Unknown").str.strip().str.lower()
 
-    # Her JPCode ve Firma için eşleşme yaparak rezervasyonları hesapla
+    # Rezervasyon eşleştirmeleri
     rez_list = []
     for _, row in ana_df.iterrows():
         jp = row["JPCode"]
@@ -35,12 +33,11 @@ def load_data(path_ana, path_booking):
         ilgili = booking_df[(booking_df["JPCode"] == jp) & (booking_df["Agency"] == ag)]
         ok = (ilgili["Durum"] == "ok").sum()
         cancelled = (ilgili["Durum"] == "cancelled").sum()
-        toplam = len(ilgili)
-        ok_yuzde = round(ok / toplam, 2) if toplam else 0
-        cancelled_yuzde = round(cancelled / toplam, 2) if toplam else 0
-        rez_list.append([ok, cancelled, toplam, ok_yuzde, cancelled_yuzde])
+        toplam = ok + cancelled
+        iptal_orani = round(cancelled / toplam, 4) if toplam else 0
+        rez_list.append([ok, cancelled, toplam, iptal_orani])
 
-    ana_df[["Rez_OK", "Rez_Cancelled", "Rez_Toplam", "Rez_OK_Yuzde", "Rez_Cancelled_Yuzde"]] = rez_list
+    ana_df[["Rez_OK", "Rez_Cancelled", "Rez_Toplam", "İptal_Orani"]] = rez_list
 
     return ana_df
 
@@ -62,22 +59,34 @@ if secili_kategori != "Tüm Kategoriler":
 if secili_firma != "Tüm Firmalar":
     df = df[df["Firma"] == secili_firma]
 
-# --- 🧾 Sayfa Başlığı ---
+# --- 📄 Sayfa Başlığı ---
 st.title("📊 Sorgu Analiz Raporu")
 st.subheader(f"Kategori: {secili_kategori} | Firma: {secili_firma}")
 
-# --- 📋 Gösterilecek Sütunlar ---
+# --- 📋 Gösterilecek Alanlar ---
 gosterilecek = df[[
     "Otel", "Sorgu_OK", "Toplam_Sorgu", "Sorgu_OK_Yuzde",
-    "Rez_OK", "Rez_Cancelled", "Rez_Toplam", "Rez_OK_Yuzde", "Rez_Cancelled_Yuzde"
+    "Rez_OK", "Rez_Cancelled", "Rez_Toplam", "İptal_Orani"
 ]].copy()
 
-# Başlıkları daha okunur hale getir
 gosterilecek.columns = [
     "Otel", "Hotel Requests OK", "Total Requests", "% Hotel Requests OK",
-    "OK", "Cancelled", "Total Reservations", "OK %", "Cancelled %"
+    "OK", "Cancelled", "Total Reservations", "Total Cancelled %"
 ]
 
-# --- 📑 Tablo Gösterimi ---
+# --- 📊 Tablo Gösterimi (Biçimli) ---
 st.markdown("### 📌 Detaylı Otel Performansı")
-st.dataframe(gosterilecek.sort_values(by="Total Reservations", ascending=False), use_container_width=True)
+
+st.dataframe(
+    gosterilecek.sort_values(by="Total Reservations", ascending=False)
+    .style.format({
+        "Hotel Requests OK": "{:,.0f}",
+        "Total Requests": "{:,.0f}",
+        "% Hotel Requests OK": "{:.0%}",
+        "OK": "{:,.0f}",
+        "Cancelled": "{:,.0f}",
+        "Total Reservations": "{:,.0f}",
+        "Total Cancelled %": "{:.0%}"
+    }),
+    use_container_width=True
+)
