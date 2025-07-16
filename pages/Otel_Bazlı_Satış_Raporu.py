@@ -31,6 +31,15 @@ pivot_df = df.pivot_table(index="Otel", columns="Durum", aggfunc="size", fill_va
 # --- ➕ Toplam Kolonu
 pivot_df["toplam"] = pivot_df.sum(axis=1)
 
+# --- 🧮 Sütunları "ok" ile başlayacak şekilde yeniden sırala
+ordered_columns = sorted([col for col in pivot_df.columns if col != "toplam"])
+if "ok" in ordered_columns:
+    ordered_columns.remove("ok")
+    new_order = ["ok"] + ordered_columns + ["toplam"]
+else:
+    new_order = ordered_columns + ["toplam"]
+pivot_df = pivot_df[new_order]
+
 # --- 🧾 Genel Toplamlar
 toplamlar = pivot_df.sum(axis=0)
 
@@ -41,7 +50,8 @@ st.markdown("### 🔸 Genel Rapor Özeti")
 
 cols = st.columns(len(toplamlar))
 for i, durum in enumerate(toplamlar.index):
-    cols[i].metric(f"{durum.capitalize()}", int(toplamlar[durum]))
+    etiket = durum.capitalize() if durum != "toplam" else "Toplam"
+    cols[i].metric(etiket, int(toplamlar[durum]))
 
 # --- 📑 Detaylı Tablo Gösterimi ---
 st.markdown("### 📊 Otel Detayları")
