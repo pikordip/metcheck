@@ -73,6 +73,9 @@ gosterilecek.columns = [
     "OK", "Cancelled", "Total Reservations", "Total Cancelled %"
 ]
 
+# ✅ Index gizleme için reset + drop
+gosterilecek = gosterilecek.reset_index(drop=True)
+
 sayisal_formatlar = {
     "Hotel Requests OK": "{:,.0f}",
     "Total Requests": "{:,.0f}",
