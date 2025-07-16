@@ -37,7 +37,7 @@ def load_data(path_ana, path_booking):
         iptal_orani = round(cancelled / toplam, 4) if toplam else 0
         rez_list.append([ok, cancelled, toplam, iptal_orani])
 
-    ana_df[["Rez_OK", "Rez_Cancelled", "Rez_Toplam", "İptal_Orani"]] = rez_list
+    ana_df[["Rez_OK", "Rez_Cancelled", "Rez_Toplam", "Toplam_Iptal_Orani"]] = rez_list
 
     return ana_df
 
@@ -66,27 +66,35 @@ st.subheader(f"Kategori: {secili_kategori} | Firma: {secili_firma}")
 # --- 📋 Gösterilecek Alanlar ---
 gosterilecek = df[[
     "Otel", "Sorgu_OK", "Toplam_Sorgu", "Sorgu_OK_Yuzde",
-    "Rez_OK", "Rez_Cancelled", "Rez_Toplam", "İptal_Orani"
+    "Rez_OK", "Rez_Cancelled", "Rez_Toplam", "Toplam_Iptal_Orani"
 ]].copy()
 
+# Başlıkları yeniden adlandır
 gosterilecek.columns = [
     "Otel", "Hotel Requests OK", "Total Requests", "% Hotel Requests OK",
     "OK", "Cancelled", "Total Reservations", "Total Cancelled %"
 ]
 
-# --- 📊 Tablo Gösterimi (Biçimli) ---
+# Sayısal sütunları biçimlendir
+sayisal_formatlar = {
+    "Hotel Requests OK": "{:,.0f}",
+    "Total Requests": "{:,.0f}",
+    "OK": "{:,.0f}",
+    "Cancelled": "{:,.0f}",
+    "Total Reservations": "{:,.0f}",
+    "% Hotel Requests OK": "{:.0%}",
+    "Total Cancelled %": "{:.0%}"
+}
+
+# Tip dönüşümleri (hata önleme)
+for col in sayisal_formatlar:
+    gosterilecek[col] = pd.to_numeric(gosterilecek[col], errors="coerce")
+
+# --- 📊 Biçimlenmiş Tablo Gösterimi ---
 st.markdown("### 📌 Detaylı Otel Performansı")
 
 st.dataframe(
     gosterilecek.sort_values(by="Total Reservations", ascending=False)
-    .style.format({
-        "Hotel Requests OK": "{:,.0f}",
-        "Total Requests": "{:,.0f}",
-        "% Hotel Requests OK": "{:.0%}",
-        "OK": "{:,.0f}",
-        "Cancelled": "{:,.0f}",
-        "Total Reservations": "{:,.0f}",
-        "Total Cancelled %": "{:.0%}"
-    }),
+    .style.format(sayisal_formatlar),
     use_container_width=True
 )
