@@ -47,7 +47,7 @@ def load_data(path_ana, path_booking):
 # --- 📥 Veri Yükle ---
 df = load_data(excel_path, excel_path)
 
-# --- 🎛️ Sidebar Entegre Filtreler ---
+# --- 🎛️ Sidebar Filtreler ---
 st.sidebar.title("🔍 Filtreler")
 
 kategori_list = sorted(df["Kategori"].dropna().unique())
@@ -56,11 +56,10 @@ secili_kategori = st.sidebar.selectbox("Kategori Seçin (zorunlu)", kategori_lis
 firma_list = sorted(df[df["Kategori"] == secili_kategori]["Firma"].dropna().unique())
 secili_firma = st.sidebar.selectbox("Firma Seç", firma_list)
 
-df_filtreli = df[(df["Kategori"] == secili_kategori) & (df["Firma"] == secili_firma)]
+rezervasyon_durumlari = ["Tümü", "Satış Var", "Satış Yok"]
+secili_durum = st.sidebar.selectbox("Rezervasyon Durumu", rezervasyon_durumlari)
 
-# --- 📄 Sayfa Başlığı ---
-st.title("📊 Sorgu Analiz Raporu")
-st.subheader(f"Kategori: {secili_kategori} | Firma: {secili_firma}")
+df_filtreli = df[(df["Kategori"] == secili_kategori) & (df["Firma"] == secili_firma)]
 
 # --- 📋 Gösterilecek Alanlar ---
 gosterilecek = df_filtreli[[
@@ -73,8 +72,12 @@ gosterilecek.columns = [
     "OK", "Cancelled", "Total Reservations", "Total Cancelled %"
 ]
 
-# ✅ Index gizleme için reset + drop
 gosterilecek = gosterilecek.reset_index(drop=True)
+
+if secili_durum == "Satış Var":
+    gosterilecek = gosterilecek[gosterilecek["OK"] > 0]
+elif secili_durum == "Satış Yok":
+    gosterilecek = gosterilecek[gosterilecek["OK"] == 0]
 
 sayisal_formatlar = {
     "Hotel Requests OK": "{:,.0f}",
@@ -89,9 +92,30 @@ sayisal_formatlar = {
 for col in sayisal_formatlar:
     gosterilecek[col] = pd.to_numeric(gosterilecek[col], errors="coerce")
 
-# --- 📊 Biçimlenmiş Tablo Gösterimi ---
-st.markdown("### 📌 Detaylı Otel Performansı")
+# --- 📄 Sayfa Başlığı ---
+st.title("📊 Sorgu Analiz Raporu")
+st.subheader(f"Kategori: {secili_kategori} | Firma: {secili_firma} | Durum: {secili_durum}")
 
+# --- 📦 Metrikler: Toplamlar Kutucuklarında
+toplamlar = gosterilecek.sum(numeric_only=True)
+kareler = st.columns(6)
+metric_labels = [
+    ("Total Requests", "Total Requests"),
+    ("Hotel Requests OK", "Hotel Requests OK"),
+    ("OK", "OK"),
+    ("Cancelled", "Cancelled"),
+    ("Total Reservations", "Total Reservations"),
+    ("Total Cancelled %", "Total Cancelled %")
+]
+for i, (etiket, kolon) in enumerate(metric_labels):
+    deger = toplamlar.get(kolon, 0)
+    if "Yuzde" in kolon or "%" in kolon:
+        kareler[i].metric(etiket, f"{deger:.0%}")
+    else:
+        kareler[i].metric(etiket, f"{int(deger):,}".replace(",", "."))
+
+# --- 📊 Tablo Gösterimi ---
+st.markdown("### 📌 Detaylı Otel Performansı")
 st.dataframe(
     gosterilecek
     .sort_values(by="Total Requests", ascending=False)
