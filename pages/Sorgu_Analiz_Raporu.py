@@ -12,7 +12,6 @@ def load_data(path_ana, path_booking):
     ana_df = pd.read_excel(path_ana, sheet_name=sheet_ana)
     booking_df = pd.read_excel(path_booking, sheet_name=sheet_booking)
 
-    # Sütunları sadeleştir ve yeniden adlandır
     ana_df = ana_df[[
         "Hotel", "JPCode", "Hotel Requests OK", "% Hotel Requests OK",
         "Total Hotel Requests", "Kategori", "SEÇ"
@@ -22,17 +21,14 @@ def load_data(path_ana, path_booking):
         "Kategori", "Firma"
     ]
 
-    # % Hotel Requests OK oranını kendimiz hesaplıyoruz
     ana_df["Sorgu_OK_Yuzde"] = (
         ana_df["Sorgu_OK"] / ana_df["Toplam_Sorgu"]
     ).fillna(0).round(4)
 
-    # Booking verisi: JPCode ve Durum
     booking_df = booking_df[["JP Code", "Agency", "Status by booking element"]].copy()
     booking_df.columns = ["JPCode", "Agency", "Durum"]
     booking_df["Durum"] = booking_df["Durum"].fillna("Unknown").str.strip().str.lower()
 
-    # Her JPCode ve Firma için rezervasyonları eşleştir
     rez_list = []
     for _, row in ana_df.iterrows():
         jp = row["JPCode"]
@@ -57,12 +53,9 @@ st.sidebar.title("🔍 Filtreler")
 kategori_list = sorted(df["Kategori"].dropna().unique())
 secili_kategori = st.sidebar.selectbox("Kategori Seçin (zorunlu)", kategori_list)
 
-# Kategori seçildiyse sadece o kategorideki firmalar listelenir
-firma_filtre = df[df["Kategori"] == secili_kategori]["Firma"].dropna().unique()
-firma_list = sorted(firma_filtre)
+firma_list = sorted(df[df["Kategori"] == secili_kategori]["Firma"].dropna().unique())
 secili_firma = st.sidebar.selectbox("Firma Seç", firma_list)
 
-# --- 🔎 Filtreleri Uygula ---
 df_filtreli = df[(df["Kategori"] == secili_kategori) & (df["Firma"] == secili_firma)]
 
 # --- 📄 Sayfa Başlığı ---
@@ -75,32 +68,31 @@ gosterilecek = df_filtreli[[
     "Rez_OK", "Rez_Cancelled", "Rez_Toplam", "Toplam_Iptal_Orani"
 ]].copy()
 
-# Başlıkları daha okunur hale getir
 gosterilecek.columns = [
     "Otel", "Hotel Requests OK", "Total Requests", "% Hotel Requests OK",
     "OK", "Cancelled", "Total Reservations", "Total Cancelled %"
 ]
 
-# --- ⛑️ Tip dönüşümleri (güvenli biçimlendirme için)
-for col in [
-    "Hotel Requests OK", "Total Requests", "OK", "Cancelled", "Total Reservations",
-    "% Hotel Requests OK", "Total Cancelled %"
-]:
+sayisal_formatlar = {
+    "Hotel Requests OK": "{:,.0f}",
+    "Total Requests": "{:,.0f}",
+    "OK": "{:,.0f}",
+    "Cancelled": "{:,.0f}",
+    "Total Reservations": "{:,.0f}",
+    "% Hotel Requests OK": "{:.0%}",
+    "Total Cancelled %": "{:.0%}"
+}
+
+for col in sayisal_formatlar:
     gosterilecek[col] = pd.to_numeric(gosterilecek[col], errors="coerce")
 
 # --- 📊 Biçimlenmiş Tablo Gösterimi ---
 st.markdown("### 📌 Detaylı Otel Performansı")
 
 st.dataframe(
-    gosterilecek.sort_values(by="Total Reservations", ascending=False)
-    .style.format({
-        "Hotel Requests OK": "{:,.0f}",
-        "Total Requests": "{:,.0f}",
-        "OK": "{:,.0f}",
-        "Cancelled": "{:,.0f}",
-        "Total Reservations": "{:,.0f}",
-        "% Hotel Requests OK": "{:.0%}",
-        "Total Cancelled %": "{:.0%}"
-    }),
+    gosterilecek
+    .sort_values(by="Total Requests", ascending=False)
+    .style.format(sayisal_formatlar)
+    .hide(axis="index"),
     use_container_width=True
 )
