@@ -12,20 +12,27 @@ def load_data(path_ana, path_booking):
     ana_df = pd.read_excel(path_ana, sheet_name=sheet_ana)
     booking_df = pd.read_excel(path_booking, sheet_name=sheet_booking)
 
+    # Sütunları sadeleştir ve yeniden adlandır
     ana_df = ana_df[[
         "Hotel", "JPCode", "Hotel Requests OK", "% Hotel Requests OK",
         "Total Hotel Requests", "Kategori", "SEÇ"
     ]].copy()
     ana_df.columns = [
-        "Otel", "JPCode", "Sorgu_OK", "Sorgu_OK_Yuzde", "Toplam_Sorgu",
+        "Otel", "JPCode", "Sorgu_OK", "Yuzdelik_Sorgu_OK", "Toplam_Sorgu",
         "Kategori", "Firma"
     ]
 
+    # % Hotel Requests OK oranını kendimiz hesaplıyoruz
+    ana_df["Sorgu_OK_Yuzde"] = (
+        ana_df["Sorgu_OK"] / ana_df["Toplam_Sorgu"]
+    ).fillna(0).round(4)
+
+    # Booking verisi: JPCode ve Durum
     booking_df = booking_df[["JP Code", "Agency", "Status by booking element"]].copy()
     booking_df.columns = ["JPCode", "Agency", "Durum"]
     booking_df["Durum"] = booking_df["Durum"].fillna("Unknown").str.strip().str.lower()
 
-    # Rezervasyon eşleştirmeleri
+    # Her JPCode ve Firma için rezervasyonları eşleştir
     rez_list = []
     for _, row in ana_df.iterrows():
         jp = row["JPCode"]
@@ -44,50 +51,41 @@ def load_data(path_ana, path_booking):
 # --- 📥 Veri Yükle ---
 df = load_data(excel_path, excel_path)
 
-# --- 🎛️ Sidebar Filtreler ---
+# --- 🎛️ Sidebar Entegre Filtreler ---
 st.sidebar.title("🔍 Filtreler")
 
 kategori_list = sorted(df["Kategori"].dropna().unique())
-secili_kategori = st.sidebar.selectbox("Kategori Seçin", ["Tüm Kategoriler"] + kategori_list)
+secili_kategori = st.sidebar.selectbox("Kategori Seçin (zorunlu)", kategori_list)
 
-firma_list = sorted(df["Firma"].dropna().unique())
-secili_firma = st.sidebar.selectbox("Firma Seç", ["Tüm Firmalar"] + firma_list)
+# Kategori seçildiyse sadece o kategorideki firmalar listelenir
+firma_filtre = df[df["Kategori"] == secili_kategori]["Firma"].dropna().unique()
+firma_list = sorted(firma_filtre)
+secili_firma = st.sidebar.selectbox("Firma Seç", firma_list)
 
 # --- 🔎 Filtreleri Uygula ---
-if secili_kategori != "Tüm Kategoriler":
-    df = df[df["Kategori"] == secili_kategori]
-if secili_firma != "Tüm Firmalar":
-    df = df[df["Firma"] == secili_firma]
+df_filtreli = df[(df["Kategori"] == secili_kategori) & (df["Firma"] == secili_firma)]
 
 # --- 📄 Sayfa Başlığı ---
 st.title("📊 Sorgu Analiz Raporu")
 st.subheader(f"Kategori: {secili_kategori} | Firma: {secili_firma}")
 
 # --- 📋 Gösterilecek Alanlar ---
-gosterilecek = df[[
+gosterilecek = df_filtreli[[
     "Otel", "Sorgu_OK", "Toplam_Sorgu", "Sorgu_OK_Yuzde",
     "Rez_OK", "Rez_Cancelled", "Rez_Toplam", "Toplam_Iptal_Orani"
 ]].copy()
 
-# Başlıkları yeniden adlandır
+# Başlıkları daha okunur hale getir
 gosterilecek.columns = [
     "Otel", "Hotel Requests OK", "Total Requests", "% Hotel Requests OK",
     "OK", "Cancelled", "Total Reservations", "Total Cancelled %"
 ]
 
-# Sayısal sütunları biçimlendir
-sayisal_formatlar = {
-    "Hotel Requests OK": "{:,.0f}",
-    "Total Requests": "{:,.0f}",
-    "OK": "{:,.0f}",
-    "Cancelled": "{:,.0f}",
-    "Total Reservations": "{:,.0f}",
-    "% Hotel Requests OK": "{:.0%}",
-    "Total Cancelled %": "{:.0%}"
-}
-
-# Tip dönüşümleri (hata önleme)
-for col in sayisal_formatlar:
+# --- ⛑️ Tip dönüşümleri (güvenli biçimlendirme için)
+for col in [
+    "Hotel Requests OK", "Total Requests", "OK", "Cancelled", "Total Reservations",
+    "% Hotel Requests OK", "Total Cancelled %"
+]:
     gosterilecek[col] = pd.to_numeric(gosterilecek[col], errors="coerce")
 
 # --- 📊 Biçimlenmiş Tablo Gösterimi ---
@@ -95,6 +93,14 @@ st.markdown("### 📌 Detaylı Otel Performansı")
 
 st.dataframe(
     gosterilecek.sort_values(by="Total Reservations", ascending=False)
-    .style.format(sayisal_formatlar),
+    .style.format({
+        "Hotel Requests OK": "{:,.0f}",
+        "Total Requests": "{:,.0f}",
+        "OK": "{:,.0f}",
+        "Cancelled": "{:,.0f}",
+        "Total Reservations": "{:,.0f}",
+        "% Hotel Requests OK": "{:.0%}",
+        "Total Cancelled %": "{:.0%}"
+    }),
     use_container_width=True
 )
