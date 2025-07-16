@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 
-# --- 🟡 Ayarlar ---
-excel_path = "data/metbeds/netbeds_data.xlsx"
+# --- 📁 Dosya Yolu Ayarı ---
+excel_path = "data/metbeds/NB_DATA.xlsx"
 sheet_name = "Product bookings"
 
 # --- 🔁 Veri Yükleme Fonksiyonu ---
@@ -17,29 +17,29 @@ def load_data(path, sheet):
 # --- 📥 Veri Yükle ---
 df = load_data(excel_path, sheet_name)
 
-# --- 🎛️ Sidebar: Firma Filtresi ---
+# --- 🎛️ Filtre: Agency Seçimi ---
 st.sidebar.title("🔍 Filtreler")
 firmalar = df["Firma"].dropna().unique().tolist()
-secili_firma = st.sidebar.selectbox("Firma Seçin (Agency)", ["Tüm Firmalar"] + firmalar)
+secili_firma = st.sidebar.selectbox("Firma seçin", ["Tüm Firmalar"] + firmalar)
 
 if secili_firma != "Tüm Firmalar":
     df = df[df["Firma"] == secili_firma]
 
-# --- 📊 Pivot Tablo Oluştur ---
+# --- 📊 Pivot Tablosu Oluştur ---
 pivot_df = df.pivot_table(index="Otel", columns="Durum", aggfunc="size", fill_value=0)
 pivot_df["Toplam"] = pivot_df.sum(axis=1)
 
-# --- 📋 Sayfa Başlığı ---
-st.title("🏨 Otel Bazlı Satış Raporu")
-st.subheader(f"📁 Firma: {secili_firma}")
-
-# --- 🔢 Genel Toplamlar ---
+# --- 🧾 Genel Toplamlar ---
 toplamlar = pivot_df.sum(axis=0)
 ok_sayisi = int(toplamlar.get("Ok", 0))
 iptal_sayisi = int(toplamlar.get("Cancelled", 0))
 toplam_rezervasyon = int(toplamlar.get("Toplam", 0))
 
+# --- 🧩 Başlık ve Metrikler ---
+st.title("🏨 Otel Bazlı Satış Raporu")
+st.subheader(f"📁 Firma: {secili_firma}")
 st.markdown("### 🔸 Genel Rapor Özeti")
+
 col1, col2, col3 = st.columns(3)
 col1.metric("🟢 Satış (Ok)", ok_sayisi)
 col2.metric("🔴 İptal (Cancelled)", iptal_sayisi)
