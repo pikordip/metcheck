@@ -21,14 +21,17 @@ def load_data(path_ana, path_booking):
         "Kategori", "Firma"
     ]
 
+    # % Hotel Requests OK yeniden hesaplanıyor
     ana_df["Sorgu_OK_Yuzde"] = (
         ana_df["Sorgu_OK"] / ana_df["Toplam_Sorgu"]
     ).fillna(0).round(4)
 
+    # Product bookings verisi düzenleniyor
     booking_df = booking_df[["JP Code", "Agency", "Status by booking element"]].copy()
     booking_df.columns = ["JPCode", "Agency", "Durum"]
     booking_df["Durum"] = booking_df["Durum"].fillna("Unknown").str.strip().str.lower()
 
+    # Rezervasyon eşleşmeleri ve oranlar
     rez_list = []
     for _, row in ana_df.iterrows():
         jp = row["JPCode"]
@@ -41,7 +44,6 @@ def load_data(path_ana, path_booking):
         rez_list.append([ok, cancelled, toplam, iptal_orani])
 
     ana_df[["Rez_OK", "Rez_Cancelled", "Rez_Toplam", "Toplam_Iptal_Orani"]] = rez_list
-
     return ana_df
 
 # --- 📥 Veri Yükle ---
@@ -49,7 +51,6 @@ df = load_data(excel_path, excel_path)
 
 # --- 🎛️ Sidebar Filtreler ---
 st.sidebar.title("🔍 Filtreler")
-
 kategori_list = sorted(df["Kategori"].dropna().unique())
 secili_kategori = st.sidebar.selectbox("Kategori Seçin (zorunlu)", kategori_list)
 
@@ -59,9 +60,9 @@ secili_firma = st.sidebar.selectbox("Firma Seç", firma_list)
 rezervasyon_durumlari = ["Tümü", "Satış Var", "Satış Yok"]
 secili_durum = st.sidebar.selectbox("Rezervasyon Durumu", rezervasyon_durumlari)
 
+# --- 🔎 Filtreleri Uygula ---
 df_filtreli = df[(df["Kategori"] == secili_kategori) & (df["Firma"] == secili_firma)]
 
-# --- 📋 Gösterilecek Alanlar ---
 gosterilecek = df_filtreli[[
     "Otel", "Sorgu_OK", "Toplam_Sorgu", "Sorgu_OK_Yuzde",
     "Rez_OK", "Rez_Cancelled", "Rez_Toplam", "Toplam_Iptal_Orani"
@@ -74,11 +75,13 @@ gosterilecek.columns = [
 
 gosterilecek = gosterilecek.reset_index(drop=True)
 
+# --- 📌 Rezervasyon Durumu Filtresi
 if secili_durum == "Satış Var":
     gosterilecek = gosterilecek[gosterilecek["OK"] > 0]
 elif secili_durum == "Satış Yok":
     gosterilecek = gosterilecek[gosterilecek["OK"] == 0]
 
+# --- ✅ Sayısal Biçimlendirme
 sayisal_formatlar = {
     "Hotel Requests OK": "{:,.0f}",
     "Total Requests": "{:,.0f}",
@@ -96,25 +99,30 @@ for col in sayisal_formatlar:
 st.title("📊 Sorgu Analiz Raporu")
 st.subheader(f"Kategori: {secili_kategori} | Firma: {secili_firma} | Durum: {secili_durum}")
 
-# --- 📦 Metrikler: Toplamlar Kutucuklarında
+# --- 📦 Kutucuklarla Toplamlar
 toplamlar = gosterilecek.sum(numeric_only=True)
-kareler = st.columns(6)
-metric_labels = [
-    ("Total Requests", "Total Requests"),
-    ("Hotel Requests OK", "Hotel Requests OK"),
-    ("OK", "OK"),
-    ("Cancelled", "Cancelled"),
-    ("Total Reservations", "Total Reservations"),
-    ("Total Cancelled %", "Total Cancelled %")
-]
-for i, (etiket, kolon) in enumerate(metric_labels):
-    deger = toplamlar.get(kolon, 0)
-    if "Yuzde" in kolon or "%" in kolon:
-        kareler[i].metric(etiket, f"{deger:.0%}")
-    else:
-        kareler[i].metric(etiket, f"{int(deger):,}".replace(",", "."))
+total_sorgu = toplamlar.get("Total Requests", 0)
+total_ok = toplamlar.get("Hotel Requests OK", 0)
+basari_orani = total_ok / total_sorgu if total_sorgu else 0
 
-# --- 📊 Tablo Gösterimi ---
+rez_ok = toplamlar.get("OK", 0)
+rez_cancelled = toplamlar.get("Cancelled", 0)
+total_rez = rez_ok + rez_cancelled
+iptal_orani = rez_cancelled / total_rez if total_rez else 0
+
+# --- 🔢 Üst Kutular
+ust = st.columns(3)
+ust[0].metric("Toplam Sorgu", f"{int(total_sorgu):,}".replace(",", "."))
+ust[1].metric("Başarı Oranı", f"{basari_orani:.0%}")
+ust[2].metric("Dönüş Yapılan Tutar", f"{int(total_ok):,}".replace(",", "."))
+
+# --- 🔢 Alt Kutular
+alt = st.columns(3)
+alt[0].metric("Rezervasyon (OK)", f"{int(rez_ok):,}".replace(",", "."))
+alt[1].metric("İptal (Cancelled)", f"{int(rez_cancelled):,}".replace(",", "."))
+alt[2].metric("İptal Oranı", f"{iptal_orani:.0%}")
+
+# --- 📊 Tablo Gösterimi
 st.markdown("### 📌 Detaylı Otel Performansı")
 st.dataframe(
     gosterilecek
