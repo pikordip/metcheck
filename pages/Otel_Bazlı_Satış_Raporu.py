@@ -17,7 +17,7 @@ def load_data(path, sheet):
 # --- 📥 Veri Yükle ---
 df = load_data(excel_path, sheet_name)
 
-# --- 🎛️ Filtre: Agency Seçimi ---
+# --- 🎛️ Sidebar: Agency Seçimi ---
 st.sidebar.title("🔍 Filtreler")
 firmalar = df["Firma"].dropna().unique().tolist()
 secili_firma = st.sidebar.selectbox("Firma seçin", ["Tüm Firmalar"] + firmalar)
@@ -25,25 +25,22 @@ secili_firma = st.sidebar.selectbox("Firma seçin", ["Tüm Firmalar"] + firmalar
 if secili_firma != "Tüm Firmalar":
     df = df[df["Firma"] == secili_firma]
 
-# --- 📊 Pivot Tablosu: Statü Bazlı Sayım ---
+# --- 📊 Pivot Tablosu Oluştur ---
 pivot_df = df.pivot_table(index="Otel", columns="Durum", aggfunc="size", fill_value=0)
 
-# --- ➕ Toplam Kolonu
+# --- ➕ Toplam Kolonu ---
 pivot_df["toplam"] = pivot_df.sum(axis=1)
 
-# --- 🧮 Sütunları "ok" ile başlayacak şekilde yeniden sırala
-ordered_columns = sorted([col for col in pivot_df.columns if col != "toplam"])
-if "ok" in ordered_columns:
-    ordered_columns.remove("ok")
-    new_order = ["ok"] + ordered_columns + ["toplam"]
-else:
-    new_order = ordered_columns + ["toplam"]
-pivot_df = pivot_df[new_order]
+# --- 📋 Statüleri Belirli Sıralamayla Göster ("ok" → "cancelled" → diğerleri)
+preferred_order = ["ok", "cancelled"]
+remaining = [col for col in pivot_df.columns if col not in preferred_order + ["toplam"]]
+new_order = preferred_order + remaining + ["toplam"]
+pivot_df = pivot_df.reindex(columns=new_order)
 
-# --- 🧾 Genel Toplamlar
+# --- 🧾 Genel Toplamlar ---
 toplamlar = pivot_df.sum(axis=0)
 
-# --- 🧩 Başlık ve Metrikler ---
+# --- 🧩 Sayfa Başlığı ve Özet Metrikler ---
 st.title("🏨 Otel Bazlı Satış Raporu")
 st.subheader(f"📁 Firma: {secili_firma}")
 st.markdown("### 🔸 Genel Rapor Özeti")
