@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 # --- 📁 Dosya Yolu Ayarı ---
-excel_path = "data/metbeds/NB_DATA.xlsx"
+excel_path = "data/NB_DATA.xlsx"
 sheet_ana = "ana_data"
 sheet_booking = "Product bookings"
 
