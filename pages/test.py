@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import io
+import math
 
 st.set_page_config(page_title="Fatura Kontrol Aracı", layout="wide")
 st.title("💼 Döviz Bazlı Grup Fatura Kontrolü")
@@ -10,10 +11,11 @@ uploaded_file = st.file_uploader("Excel dosyanızı yükleyin", type=["xlsx"])
 if uploaded_file:
     df = pd.read_excel(uploaded_file)
 
-    # Sayısal dönüşüm
+    # Sayısal dönüşüm ve yuvarlama
     def to_float(val):
         try:
-            return float(str(val).replace(".", "").replace(",", "."))
+            val_clean = str(val).replace(".", "").replace(",", ".")
+            return round(float(val_clean), 2)
         except:
             return 0.0
 
