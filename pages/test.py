@@ -26,62 +26,79 @@ if uploaded_file:
         except:
             return val
 
-    currencies = ["EUR", "GBP", "USD", "TRY"]
+    # Durum belirleme
+    def get_status(val):
+        if pd.isna(val):
+            return ""
+        elif val == 0:
+            return "Tam Ödendi"
+        elif val > 0:
+            return "Eksik Ödeme"
+        else:
+            return "Fazla Ödendi"
+
+    # Renk kodları
     status_colors = {
         "Eksik Ödeme": "#FFCCCC",   # Kırmızı
         "Fazla Ödendi": "#CCFFCC",  # Yeşil
         "Tam Ödendi": "#FFFFCC"     # Sarı
     }
 
-    for cur in currencies:
-        invoice_col = f"{cur}|Invoice"
-        paid_col = f"{cur}|Rec.Paid"
-        status_col = f"{cur}|Fark"
-        durum_col = f"{cur}|Durum"
+    # Rapor tablosu oluştur
+    report_rows = []
+    currencies = ["EUR", "GBP", "USD", "TRY"]
 
-        if invoice_col in df.columns and paid_col in df.columns:
-            df[invoice_col] = clean_numeric(invoice_col)
-            df[paid_col] = clean_numeric(paid_col)
+    for idx, row in df.iterrows():
+        voucher = row.get("Voucher", "")
+        for cur in currencies:
+            invoice_col = f"{cur}|Invoice"
+            paid_col = f"{cur}|Rec.Paid"
 
-            df[status_col] = df[invoice_col].fillna(0) - df[paid_col].fillna(0)
+            if invoice_col in df.columns and paid_col in df.columns:
+                invoice = row[invoice_col]
+                paid = row[paid_col]
 
-            def get_status(val):
-                if pd.isna(val):
-                    return ""
-                elif val == 0:
-                    return "Tam Ödendi"
-                elif val > 0:
-                    return "Eksik Ödeme"
-                else:
-                    return "Fazla Ödendi"
+                try:
+                    invoice_clean = float(str(invoice).replace(".", "").replace(",", "."))
+                    paid_clean = float(str(paid).replace(".", "").replace(",", "."))
+                except:
+                    invoice_clean = 0.0
+                    paid_clean = 0.0
 
-            df[durum_col] = df[status_col].apply(get_status)
+                fark = invoice_clean - paid_clean
+                durum = get_status(fark)
+                fark_formatted = format_turkish_number(fark)
 
-            # Görsel için biçimlendirilmiş sayı sütunu ekle
-            df[f"{cur}|Fark (Görsel)"] = df[status_col].apply(format_turkish_number)
+                report_rows.append({
+                    "Voucher": voucher,
+                    "Döviz Cinsi": cur,
+                    "Invoice Tutarı": format_turkish_number(invoice_clean),
+                    "Rec.Paid Tutarı": format_turkish_number(paid_clean),
+                    "Fark": fark_formatted,
+                    "Durum": durum
+                })
 
-    st.subheader("✅ Kontrol Sonuçları")
-    st.dataframe(df)
+    report_df = pd.DataFrame(report_rows)
+    st.subheader("✅ Kontrol Raporu")
+    st.dataframe(report_df)
 
     # Excel çıktısı oluştur
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='Kontrol')
+        report_df.to_excel(writer, index=False, sheet_name='Rapor')
         workbook = writer.book
-        worksheet = writer.sheets['Kontrol']
+        worksheet = writer.sheets['Rapor']
 
-        # Renklendirme
-        for col in df.columns:
-            if col.endswith("|Durum"):
-                col_idx = df.columns.get_loc(col)
-                for row_num, value in enumerate(df[col], start=1):
-                    color = status_colors.get(value, None)
-                    if color:
-                        fmt = workbook.add_format({'bg_color': color})
-                        worksheet.write(row_num, col_idx, value, fmt)
+        # Durum sütununu renklendir
+        durum_col_idx = report_df.columns.get_loc("Durum")
+        for row_num, value in enumerate(report_df["Durum"], start=1):
+            color = status_colors.get(value, None)
+            if color:
+                fmt = workbook.add_format({'bg_color': color})
+                worksheet.write(row_num, durum_col_idx, value, fmt)
 
     st.download_button(
-        label="📥 Düzenlenmiş Excel'i İndir",
+        label="📥 Raporu Excel Olarak İndir",
         data=output.getvalue(),
         file_name="kontrol_raporu.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
