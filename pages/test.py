@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import io
-import math
 
 st.set_page_config(page_title="Fatura Kontrol Aracı", layout="wide")
 st.title("💼 Döviz Bazlı Grup Fatura Kontrolü")
@@ -14,8 +13,12 @@ if uploaded_file:
     # Sayısal dönüşüm ve yuvarlama
     def to_float(val):
         try:
-            val_clean = str(val).replace(".", "").replace(",", ".")
-            return round(float(val_clean), 2)
+            val_str = str(val).strip()
+            if "," in val_str and "." not in val_str:
+                val_str = val_str.replace(",", ".")
+            elif "." in val_str and "," in val_str:
+                val_str = val_str.replace(".", "").replace(",", ".")
+            return round(float(val_str), 2)
         except:
             return 0.0
 
