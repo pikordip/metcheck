@@ -1,15 +1,16 @@
 import streamlit as st
 
 # --- Sayfa Ayarı ---
-st.set_page_config(page_title="Ana Sayfa", page_icon="🏠", layout="wide")
+st.set_page_config(page_title="METCHECK Kontrol Paneli", page_icon="✅", layout="wide")
 
 # --- Başlık ---
-st.title("🏠 Metbeds Kontrol Paneli")
+st.title("✅ METCHECK Kontrol Paneli")
 
 # --- Açıklama ---
 st.markdown("""
-Hoş geldiniz!  
-Bu panel üzerinden operasyonel raporlamalara geçiş yapabilirsiniz.
+Merhaba 👋  
+METCHECK'e hoş geldiniz.
 
-Sol menüden analiz sayfalarına erişerek sorgu ve rezervasyon verilerini görüntüleyebilirsiniz.
+Bu panel üzerinden operasyonel kontrolleri, finansal raporlamaları ve rezervasyon analizlerini görüntüleyebilirsiniz.  
+Sol menüden ilgili modüllere geçiş yaparak detaylı sorgulama ve veri kontrolü gerçekleştirebilirsiniz.
 """)
