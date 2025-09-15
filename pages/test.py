@@ -3,28 +3,30 @@ import pandas as pd
 import io
 
 st.set_page_config(page_title="Fatura Kontrol Aracı", layout="wide")
-st.title("💼 Döviz Bazlı Fatura ve Ödeme Kontrolü")
+st.title("💼 Döviz Bazlı Grup Fatura Kontrolü")
 
 uploaded_file = st.file_uploader("Excel dosyanızı yükleyin", type=["xlsx"])
 
 if uploaded_file:
     df = pd.read_excel(uploaded_file)
 
-    # Sayısal dönüşüm ve Türk noktalama biçimi
+    # Sayısal dönüşüm
     def to_float(val):
         try:
             return float(str(val).replace(".", "").replace(",", "."))
         except:
             return 0.0
 
+    # Türk biçimlendirme
     def format_tr(val):
         try:
             return f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         except:
             return val
 
+    # Durum belirleme (±0.01 tolerans)
     def get_status(fark):
-        if fark == 0:
+        if abs(fark) < 0.01:
             return "Tam Ödendi"
         elif fark > 0:
             return "Eksik Ödeme"
@@ -32,29 +34,36 @@ if uploaded_file:
             return "Fazla Ödendi"
 
     status_colors = {
-        "Eksik Ödeme": "#FFCCCC",   # Kırmızı
-        "Fazla Ödendi": "#CCFFCC",  # Yeşil
-        "Tam Ödendi": "#FFFFCC"     # Sarı
+        "Eksik Ödeme": "#FFCCCC",
+        "Fazla Ödendi": "#CCFFCC",
+        "Tam Ödendi": "#FFFFCC"
     }
 
     currencies = ["EUR", "GBP", "USD", "TRY"]
     report_rows = []
 
-    for _, row in df.iterrows():
-        voucher = row.get("Voucher", "")
-        for cur in currencies:
-            inv_col = f"{cur}|Invoice"
-            paid_col = f"{cur}|Rec.Paid"
-            if inv_col in df.columns and paid_col in df.columns:
-                inv = to_float(row[inv_col])
-                paid = to_float(row[paid_col])
+    for cur in currencies:
+        inv_col = f"{cur}|Invoice"
+        paid_col = f"{cur}|Rec.Paid"
+        if inv_col in df.columns and paid_col in df.columns:
+            df["Voucher"] = df["Voucher"].astype(str)
+            df[inv_col] = df[inv_col].apply(to_float)
+            df[paid_col] = df[paid_col].apply(to_float)
+
+            grouped = df.groupby("Voucher")[[inv_col, paid_col]].sum().reset_index()
+
+            for _, row in grouped.iterrows():
+                voucher = row["Voucher"]
+                inv = row[inv_col]
+                paid = row[paid_col]
                 fark = inv - paid
                 durum = get_status(fark)
+
                 report_rows.append({
                     "Voucher": voucher,
                     "Döviz Cinsi": cur,
-                    "Invoice Tutarı": format_tr(inv),
-                    "Rec.Paid Tutarı": format_tr(paid),
+                    "Toplam Invoice": format_tr(inv),
+                    "Toplam Rec.Paid": format_tr(paid),
                     "Fark": format_tr(fark),
                     "Durum": durum
                 })
@@ -63,8 +72,8 @@ if uploaded_file:
 
     # 🔍 Filtreleme
     st.sidebar.header("🔎 Filtrele")
-    selected_currency = st.sidebar.multiselect("Döviz Cinsi", options=report_df["Döviz Cinsi"].unique(), default=report_df["Döviz Cinsi"].unique())
-    selected_status = st.sidebar.multiselect("Durum", options=report_df["Durum"].unique(), default=report_df["Durum"].unique())
+    selected_currency = st.sidebar.multiselect("Döviz Cinsi", report_df["Döviz Cinsi"].unique(), report_df["Döviz Cinsi"].unique())
+    selected_status = st.sidebar.multiselect("Durum", report_df["Durum"].unique(), report_df["Durum"].unique())
 
     filtered_df = report_df[
         report_df["Döviz Cinsi"].isin(selected_currency) &
@@ -81,7 +90,6 @@ if uploaded_file:
         workbook = writer.book
         worksheet = writer.sheets['Rapor']
 
-        # Renklendirme
         durum_col_idx = filtered_df.columns.get_loc("Durum")
         for row_num, value in enumerate(filtered_df["Durum"], start=1):
             color = status_colors.get(value, None)
@@ -92,6 +100,6 @@ if uploaded_file:
     st.download_button(
         label="📥 Raporu Excel Olarak İndir",
         data=output.getvalue(),
-        file_name="kontrol_raporu.xlsx",
+        file_name="grup_kontrol_raporu.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
